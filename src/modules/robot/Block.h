@@ -49,6 +49,10 @@ class Block {
         float          entry_speed;
         float          exit_speed;
         float          rate_delta;         // Nomber of steps to add to the speed for each acceleration tick
+        float          acc_gain_corr;	   // Cosine approximation gain correction
+        float          acc_delta;	   // Cosine gain factor (not to be confused with rate_delta)
+        float          dec_gain_corr;	   // Cosine approximation gain correction
+        float          dec_delta;	   // Cosine gain factor (not to be confused with rate_delta)
         float          acceleration;       // the acceleratoin for this block
         unsigned int   initial_rate;       // Initial speed in steps per second
         unsigned int   final_rate;         // Final speed in steps per second

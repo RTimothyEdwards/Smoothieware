@@ -11,6 +11,13 @@
 #include "libs/Module.h"
 #include <stdint.h>
 
+typedef enum {
+        TRAP_INIT = 0,
+        TRAP_ACCEL,
+        TRAP_CRUISE,
+        TRAP_DECEL
+} trapState;
+
 class Block;
 class StepperMotor;
 
@@ -42,6 +49,9 @@ public:
 private:
     Block *current_block;
     float trapezoid_adjusted_rate;
+    float a;			// Cosine forward difference factor
+    float b;			// Sine forward difference factor
+    unsigned char state;	// Position in trapezoid
     StepperMotor *main_stepper;
 
     struct {

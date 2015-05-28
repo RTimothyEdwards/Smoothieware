@@ -48,6 +48,10 @@ void Block::clear()
     entry_speed         = 0.0F;
     exit_speed          = 0.0F;
     rate_delta          = 0.0F;
+    acc_gain_corr       = 1.0F;
+    acc_delta	        = 0.0F;
+    dec_gain_corr       = 1.0F;
+    dec_delta	        = 0.0F;
     acceleration        = 100.0F; // we don't want to get devide by zeroes if this is not set
     initial_rate        = -1;
     final_rate          = -1;
@@ -118,15 +122,26 @@ void Block::calculate_trapezoid( float entryspeed, float exitspeed )
     // have to use intersection_distance() to calculate when to abort acceleration and start braking
     // in order to reach the final_rate exactly at the end of this block.
     if (plateau_steps < 0) {
+        float save_acc_steps = accelerate_steps;
         accelerate_steps = ceilf(this->intersection_distance(this->initial_rate, this->final_rate, acceleration_per_second, this->steps_event_count));
         accelerate_steps = max( accelerate_steps, 0 ); // Check limits due to numerical round-off
         accelerate_steps = min( accelerate_steps, int(this->steps_event_count) );
+        decelerate_steps = int(this->steps_event_count) - accelerate_steps;
         plateau_steps = 0;
+
+        // Reduce nominal rate
+        this->nominal_rate = this->initial_rate + (this->nominal_rate - this->initial_rate) * (accelerate_steps / save_acc_steps);
     }
     this->accelerate_until = accelerate_steps;
     this->decelerate_after = accelerate_steps + plateau_steps;
 
     this->exit_speed = exitspeed;
+
+    // Gain correction and delta for cosine approximation
+    this->acc_gain_corr = (float)(accelerate_steps - 2) / (float)(accelerate_steps + 1);
+    this->acc_delta = M_PI / (float)(accelerate_steps - 1);
+    this->dec_gain_corr = (float)(decelerate_steps - 2) / (float)(decelerate_steps + 1);
+    this->dec_delta = M_PI / (float)(decelerate_steps - 1);
 }
 
 // Calculates the distance (not time) it takes to accelerate from initial_rate to target_rate using the

@@ -235,6 +235,7 @@ void Stepper::trapezoid_generator_tick(void)
 {
     // Do not do the accel math for nothing
     if(this->current_block && !this->paused && this->main_stepper->moving ) {
+	float anext;
 
         // Store this here because we use it a lot down there
         uint32_t current_steps_completed = this->main_stepper->stepped;
@@ -263,7 +264,20 @@ void Stepper::trapezoid_generator_tick(void)
         } else if(current_steps_completed <= this->current_block->accelerate_until) {
             // If we are accelerating
             // Increase speed
-            this->trapezoid_adjusted_rate += this->current_block->rate_delta;
+            if (this->state != (char)TRAP_ACCEL) {
+                this->a = 0.0F;
+                this->b = 0.5F * (1.0F - this->current_block->acc_delta);
+            }
+            this->state = (char)TRAP_ACCEL;
+
+            // Adjust forward difference factors
+            anext = this->current_block->acc_delta * (0.5F - this->b);
+            this->b -= this->current_block->acc_delta * (0.5F - this->a);
+
+            // this->trapezoid_adjusted_rate += this->current_block->rate_delta;
+            this->trapezoid_adjusted_rate += anext * this->current_block->acc_gain_corr * (this->current_block->nominal_rate - this->current_block->initial_rate);
+            this->a += anext;
+
             if (this->trapezoid_adjusted_rate > this->current_block->nominal_rate ) {
                 this->trapezoid_adjusted_rate = this->current_block->nominal_rate;
             }
@@ -271,21 +285,39 @@ void Stepper::trapezoid_generator_tick(void)
         } else if (current_steps_completed > this->current_block->decelerate_after) {
             // If we are decelerating
             // Reduce speed
+            if (this->state != (char)TRAP_DECEL) {
+                this->a = 0.0F;
+                this->b = 0.5F * (1.0F - this->current_block->dec_delta);
+            }
+            this->state = (char)TRAP_DECEL;
+
+            // Adjust forward difference factors
+            anext = this->current_block->dec_delta * (0.5F - this->b);
+            this->b -= this->current_block->dec_delta * (0.5F - this->a);
+
             // NOTE: We will only reduce speed if the result will be > 0. This catches small
             // rounding errors that might leave steps hanging after the last trapezoid tick.
+	    /*------------
             if(this->trapezoid_adjusted_rate > this->current_block->rate_delta * 1.5F) {
                 this->trapezoid_adjusted_rate -= this->current_block->rate_delta;
             } else {
                 this->trapezoid_adjusted_rate = this->current_block->rate_delta * 1.5F;
             }
+	    ------------*/
+            this->trapezoid_adjusted_rate -= anext * this->current_block->dec_gain_corr * (this->current_block->nominal_rate - this->current_block->final_rate);
+            this->a += anext;
+
             if(this->trapezoid_adjusted_rate < this->current_block->final_rate ) {
                 this->trapezoid_adjusted_rate = this->current_block->final_rate;
             }
 
         } else if (trapezoid_adjusted_rate != current_block->nominal_rate) {
             // If we are cruising
+	    if (this->state == (char)TRAP_INIT) {
+		this->trapezoid_adjusted_rate = this->current_block->nominal_rate;
+	    }
             // Make sure we cruise at exactly nominal rate
-            this->trapezoid_adjusted_rate = this->current_block->nominal_rate;
+            // this->trapezoid_adjusted_rate = this->current_block->nominal_rate;
         }
 
         if(last_rate != trapezoid_adjusted_rate) {
@@ -301,6 +333,9 @@ inline void Stepper::trapezoid_generator_reset()
 {
     this->trapezoid_adjusted_rate = this->current_block->initial_rate;
     this->force_speed_update = true;
+    this->state = (char)TRAP_INIT;
+    this->a = 0.0F;
+    this->b = 0.5F;
 }
 
 // Update the speed for all steppers
