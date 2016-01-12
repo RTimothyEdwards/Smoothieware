@@ -82,6 +82,7 @@ Extruder::Extruder( uint16_t config_identifier, bool single )
     this->absolute_mode = true;
     this->milestone_absolute_mode = true;
     this->enabled = false;
+    this->always_on = false;
     this->paused = false;
     this->single_config = single;
     this->identifier = config_identifier;
@@ -290,6 +291,13 @@ void Extruder::on_set_public_data(void *argument)
     }
 }
 
+// Disable only if not set to always_on.
+void Extruder::disable(void *argument)
+{
+    if (!this->always_on)
+        this->enabled = false;
+}
+
 // When the play/pause button is set to pause, or a module calls the ON_PAUSE event
 void Extruder::on_pause(void *argument)
 {
@@ -405,23 +413,43 @@ void Extruder::on_gcode_received(void *argument)
                 }
             }
 
+	} else if( gcode->m == 605 ) {
+            // M605 S2 causes current extruder to never be disabled.
+            // M605 S0 returns extruder to normal mode.
+            if(gcode->has_letter('S')) {
+                if(gcode->get_value('S') == 0) {
+		    if (this->always_on) {
+                        this->enabled = false;
+                        this->always_on = false;
+                        gcode->stream->printf("Extruder enabled/disabled normally\n");
+		    }
+                } else if(gcode->get_value('S') == 2) {
+		    if (!this->enabled) {
+                        this->always_on = true;
+                        this->enabled = true;
+                        gcode->stream->printf("Extruder always enabled\n");
+		    }
+                }
+            }
         } else if( gcode->m == 17 || gcode->m == 18 || gcode->m == 82 || gcode->m == 83 || gcode->m == 84 ) {
             // Mcodes to pass along to on_gcode_execute
-            THEKERNEL->conveyor->append_gcode(gcode);
-
-        }
-
+	    if (!this->always_on)
+                THEKERNEL->conveyor->append_gcode(gcode);
+	}
     }else if(gcode->has_g) {
         // G codes, NOTE some are ignored if not enabled
         if( (gcode->g == 92 && gcode->has_letter('E')) || (gcode->g == 90 || gcode->g == 91) ) {
             // Gcodes to pass along to on_gcode_execute
-            THEKERNEL->conveyor->append_gcode(gcode);
+	    if (!this->always_on)
+                THEKERNEL->conveyor->append_gcode(gcode);
 
         }else if( this->enabled && gcode->g < 4 && gcode->has_letter('E') && fabsf(gcode->millimeters_of_travel) < 0.00001F ) { // With floating numbers, we can have 0 != 0, NOTE needs to be same as in Robot.cpp#745
             // NOTE was ... gcode->has_letter('E') && !gcode->has_letter('X') && !gcode->has_letter('Y') && !gcode->has_letter('Z') ) {
             // This is a SOLO move, we add an empty block to the queue to prevent subsequent gcodes being executed at the same time
-            THEKERNEL->conveyor->append_gcode(gcode);
-            THEKERNEL->conveyor->queue_head_block();
+	    if (!this->always_on) {
+                THEKERNEL->conveyor->append_gcode(gcode);
+                THEKERNEL->conveyor->queue_head_block();
+	    }
 
         }else if( this->enabled && (gcode->g == 10 || gcode->g == 11) ) { // firmware retract command
             // check we are in the correct state of retract or unretract
@@ -449,8 +477,10 @@ void Extruder::on_gcode_received(void *argument)
             }
 
             // This is a solo move, we add an empty block to the queue to prevent subsequent gcodes being executed at the same time
-            THEKERNEL->conveyor->append_gcode(gcode);
-            THEKERNEL->conveyor->queue_head_block();
+	    if (!this->always_on) {
+                THEKERNEL->conveyor->append_gcode(gcode);
+                THEKERNEL->conveyor->queue_head_block();
+	    }
 
             if(retract_zlift_length > 0 && gcode->g == 10) {
                 char buf[32];

@@ -522,7 +522,7 @@ bool ZGridStrategy::doProbing(StreamOutput *stream)  // probed calibration
         } else {
             this->next_cal();                                     // to not cause damage to machine due to Z-offset
         }
-        this->pData[pindex] = z ;                                 // save the offset
+        this->pData[pindex] = z; 	                          // save the offset
     }
 
     stream->printf("\nCalibration done.  Please remove probe\n");
