@@ -46,7 +46,11 @@ gamma_max_rate                               300.0            # mm/min actuator 
 # Serial communications configuration ( baud rate default to 9600 if undefined )
 uart0.baud_rate                              115200           # Baud rate for the default hardware serial port
 second_usb_serial_enable                     false            # This enables a second usb serial port (to have both pronterface and a terminal connected)
+
 #msd_disable                                 false            # disable the MSD (USB SDCARD) when set to true
+#leds_disable                                true             # disable using leds after config loaded
+#dfu_enable                                  false            # for linux developers, set to true to enable DFU
+#watchdog_timeout                            10               # watchdog timeout in seconds, default is 10, set to 0 to disable the watchdog
 
 # Extruder module configuration
 extruder_module_enable                       true             # Whether to activate the extruder module at all. All configuration is ignored if false
@@ -152,6 +156,7 @@ gamma_max                                    200              #
 #alpha_limit_enable                          false            # set to true to enable X min and max limit switches
 #beta_limit_enable                           false            # set to true to enable Y min and max limit switches
 #gamma_limit_enable                          false            # set to true to enable Z min and max limit switches
+#move_to_origin_after_home                   false            # move XY to 0,0 after homing
 
 #probe endstop
 #probe_pin                                   1.29             # optional pin for probe
@@ -188,8 +193,9 @@ zprobe.probe_height                          5               # how much above be
 #leveling-strategy.three-point-leveling.save_plane     false       # set to true to allow the bed plane to be saved with M500 default is false
 
 
-# Pause button
-pause_button_enable                          true             #
+# kill button (used to be called pause) maybe assigned to a different pin, set to the onboard pin by default
+kill_button_enable                           true             # set to true to enable a kill button
+kill_button_pin                              2.12             # kill button pin. default is same as pause button 2.12 (2.11 is another good choice)
 
 # Panel See http://smoothieware.org/panel
 panel.enable                                 false             # set to true to enable the panel code
@@ -248,5 +254,3 @@ custom_menu.power_off.command              M81               #
 currentcontrol_module_enable                 true            #
 digipot_max_current                          2.4             # max current
 digipot_factor                               106.0           # factor for converting current to digipot value
-
-return_error_on_unhandled_gcode              false            #

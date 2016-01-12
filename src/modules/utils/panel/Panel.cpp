@@ -20,7 +20,6 @@
 #include "screens/MainMenuScreen.h"
 #include "SlowTicker.h"
 #include "Gcode.h"
-#include "Pauser.h"
 #include "TemperatureControlPublicAccess.h"
 #include "ModifyValuesScreen.h"
 #include "PublicDataRequest.h"
@@ -84,7 +83,6 @@ Panel::Panel()
     this->sd= nullptr;
     this->extmounter= nullptr;
     this->external_sd_enable= false;
-    this->halted= false;
     strcpy(this->playing_file, "Playing file");
 }
 
@@ -166,7 +164,6 @@ void Panel::on_module_loaded()
     this->down_button.up_attach(  this, &Panel::on_down );
     this->click_button.up_attach( this, &Panel::on_select );
     this->back_button.up_attach(  this, &Panel::on_back );
-    this->pause_button.up_attach( this, &Panel::on_pause );
 
 
     //setting longpress_delay
@@ -190,7 +187,6 @@ void Panel::on_module_loaded()
     // Register for events
     this->register_for_event(ON_IDLE);
     this->register_for_event(ON_MAIN_LOOP);
-    this->register_for_event(ON_HALT);
     this->register_for_event(ON_SET_PUBLIC_DATA);
 
     // Refresh timer
@@ -374,7 +370,6 @@ void Panel::on_idle(void *argument)
         this->down_button.check_signal(but & BUTTON_DOWN);
         this->back_button.check_signal(but & BUTTON_LEFT);
         this->click_button.check_signal(but & BUTTON_SELECT);
-        this->pause_button.check_signal(but & BUTTON_PAUSE);
     }
 
     // If we are in menu mode and the position has changed
@@ -432,16 +427,6 @@ uint32_t Panel::on_select(uint32_t dummy)
     this->click_changed = true;
     this->idle_time = 0;
     lcd->buzz(60, 300); // 50ms 300Hz
-    return 0;
-}
-
-uint32_t Panel::on_pause(uint32_t dummy)
-{
-    if (!THEKERNEL->pauser->paused()) {
-        THEKERNEL->pauser->take();
-    } else {
-        THEKERNEL->pauser->release();
-    }
     return 0;
 }
 
@@ -675,9 +660,4 @@ void Panel::on_second_tick(void *arg)
     }else{
         // TODO for panels with no sd card detect we need to poll to see if card is inserted - or not
     }
-}
-
-void Panel::on_halt(void *arg)
-{
-    halted= (arg == nullptr);
 }

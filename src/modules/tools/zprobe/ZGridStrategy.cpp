@@ -515,17 +515,21 @@ bool ZGridStrategy::doProbing(StreamOutput *stream)  // probed calibration
 
         pindex = int(this->cal[X_AXIS]/this->bed_div_x + 0.25)*this->numCols + int(this->cal[Y_AXIS]/this->bed_div_y + 0.25);
 
-        if (probes == (probe_points-1) && this->wait_for_probe){  // Only move to removal position if probe confirmation was selected
-            this->cal[X_AXIS] = this->bed_x/2.0f;                 // Else machine will return to first probe position when done
-            this->cal[Y_AXIS] = this->bed_y/2.0f;
-            this->cal[Z_AXIS] = this->bed_z/2.0f;                 // Position head for probe removal
-        } else {
-            this->next_cal();                                     // to not cause damage to machine due to Z-offset
-        }
-        this->pData[pindex] = z ;                                 // save the offset
+        this->next_cal();                                        // Calculate next calibration position
+
+        this->pData[pindex] = z ;                                // save the offset
     }
 
-    stream->printf("\nCalibration done.  Please remove probe\n");
+    stream->printf("\nCalibration done.\n");
+    if (this->wait_for_probe) {                                  // Only do this it the config calls for probe removal position
+        this->cal[X_AXIS] = this->bed_x/2.0f;
+        this->cal[Y_AXIS] = this->bed_y/2.0f;
+        this->cal[Z_AXIS] = this->bed_z/2.0f;                    // Position head for probe removal
+        this->move(this->cal, slow_rate);
+
+        stream->printf("Please remove probe\n");
+
+    }
 
     // activate correction
     this->normalize_grid();
@@ -580,15 +584,10 @@ void ZGridStrategy::homexyz()
 
 void ZGridStrategy::move(float *position, float feed)
 {
-    char cmd[64];
-
-    // Assemble Gcode to add onto the queue.  Also translate the position for non standard cartesian spaces (cal_offset)
-    snprintf(cmd, sizeof(cmd), "G0 X%1.3f Y%1.3f Z%1.3f F%1.1f", position[0] + this->cal_offset_x, position[1] + this->cal_offset_y, position[2], feed * 60); // use specified feedrate (mm/sec)
+    // translate the position for non standard cartesian spaces (cal_offset)
+    zprobe->coordinated_move(position[0] + this->cal_offset_x, position[1] + this->cal_offset_y, position[2], feed); // use specified feedrate (mm/sec)
 
     //THEKERNEL->streams->printf("DEBUG: move: %s cent: %i\n", cmd, this->center_zero);
-
-    Gcode gc(cmd, &(StreamOutput::NullStream));
-    THEKERNEL->robot->on_gcode_received(&gc); // send to robot directly
 }
 
 
@@ -657,7 +656,7 @@ float ZGridStrategy::getZOffset(float X, float Y)
 
     int xIndex = (int)(floorf(xdiff));	// Get the current sector (X)
     int yIndex = (int)(floorf(ydiff));	// Get the current sector (Y)
-    
+
     // Index bounds limited to be inside the table
     if (xIndex < 0) xIndex = 0;
     else if (xIndex > (this->numRows - 2)) xIndex = this->numRows - 2;

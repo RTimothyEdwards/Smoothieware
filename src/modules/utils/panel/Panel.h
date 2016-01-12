@@ -35,7 +35,6 @@ class Panel : public Module {
         uint32_t button_tick(uint32_t dummy);
         uint32_t encoder_tick(uint32_t dummy);
         void on_idle(void* argument);
-        void on_halt(void* argument);
         void on_main_loop(void* argument);
         void on_set_public_data(void* argument);
         void on_second_tick(void* argument);
@@ -47,7 +46,6 @@ class Panel : public Module {
         uint32_t on_down(uint32_t dummy);
         uint32_t on_back(uint32_t dummy);
         uint32_t on_select(uint32_t dummy);
-        uint32_t on_pause(uint32_t dummy);
         uint32_t refresh_tick(uint32_t dummy);
         uint32_t encoder_check(uint32_t dummy);
         bool counter_change();
@@ -81,7 +79,6 @@ class Panel : public Module {
 
         string getMessage() { return message; }
         bool hasMessage() { return message.size() > 0; }
-        bool is_halted() const { return halted; }
 
         uint16_t get_screen_lines() const { return screen_lines; }
 
@@ -117,7 +114,6 @@ class Panel : public Module {
         Button down_button;
         Button back_button;
         Button click_button;
-        Button pause_button;
 
         int* counter;
 
@@ -142,7 +138,6 @@ class Panel : public Module {
             bool menu_changed:1;
             bool control_value_changed:1;
             bool external_sd_enable:1;
-            bool halted:1;
             volatile bool counter_changed:1;
             volatile bool click_changed:1;
             volatile bool refresh_flag:1;

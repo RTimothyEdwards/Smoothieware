@@ -18,13 +18,14 @@
 #include "modules/tools/temperatureswitch/TemperatureSwitch.h"
 #include "modules/tools/drillingcycles/Drillingcycles.h"
 #include "FilamentDetector.h"
+#include "MotorDriverControl.h"
 
 #include "modules/robot/Conveyor.h"
 #include "modules/utils/simpleshell/SimpleShell.h"
 #include "modules/utils/configurator/Configurator.h"
 #include "modules/utils/currentcontrol/CurrentControl.h"
 #include "modules/utils/player/Player.h"
-#include "modules/utils/pausebutton/PauseButton.h"
+#include "modules/utils/killbutton/KillButton.h"
 #include "modules/utils/PlayLed/PlayLed.h"
 #include "modules/utils/panel/Panel.h"
 #include "libs/Network/uip/Network.h"
@@ -58,10 +59,9 @@
 
 #define second_usb_serial_enable_checksum  CHECKSUM("second_usb_serial_enable")
 #define disable_msd_checksum  CHECKSUM("msd_disable")
-#define disable_leds_checksum  CHECKSUM("leds_disable")
 #define dfu_enable_checksum  CHECKSUM("dfu_enable")
+#define watchdog_timeout_checksum  CHECKSUM("watchdog_timeout")
 
-// Watchdog wd(5000000, WDT_MRI);
 
 // USB Stuff
 SDCard sd  __attribute__ ((section ("AHBSRAM0"))) (P0_9, P0_8, P0_7, P0_6);      // this selects SPI1 as the sdcard as it is on Smoothieboard
@@ -110,9 +110,6 @@ void init() {
     Version version;
     kernel->streams->printf("  Build version %s, Build date %s\r\n", version.get_build(), version.get_build_date());
 
-    //some boards don't have leds.. TOO BAD!
-    kernel->use_leds= !kernel->config->value( disable_leds_checksum )->by_default(false)->as_bool();
-
     bool sdok= (sd.disk_initialize() == 0);
     if(!sdok) kernel->streams->printf("SDCard is disabled\r\n");
 
@@ -135,7 +132,7 @@ void init() {
     kernel->add_module( new SimpleShell() );
     kernel->add_module( new Configurator() );
     kernel->add_module( new CurrentControl() );
-    kernel->add_module( new PauseButton() );
+    kernel->add_module( new KillButton() );
     kernel->add_module( new PlayLed() );
     kernel->add_module( new Endstops() );
     kernel->add_module( new Player() );
@@ -190,7 +187,9 @@ void init() {
     #ifndef NO_TOOLS_FILAMENTDETECTOR
     kernel->add_module( new FilamentDetector() );
     #endif
-
+    #ifndef NO_UTILS_MOTORDRIVERCONTROL
+    kernel->add_module( new MotorDriverControl(0) );
+    #endif
     // Create and initialize USB stuff
     u.init();
 
@@ -210,12 +209,24 @@ void init() {
     if( kernel->config->value( dfu_enable_checksum )->by_default(false)->as_bool() ){
         kernel->add_module( new(AHB0) DFU(&u));
     }
+
+    // 10 second watchdog timeout (or config as seconds)
+    float t= kernel->config->value( watchdog_timeout_checksum )->by_default(10.0F)->as_number();
+    if(t > 0.1F) {
+        // NOTE setting WDT_RESET with the current bootloader would leave it in DFU mode which would be suboptimal
+        kernel->add_module( new Watchdog(t*1000000, WDT_MRI)); // WDT_RESET));
+        kernel->streams->printf("Watchdog enabled for %f seconds\n", t);
+    }else{
+        kernel->streams->printf("WARNING Watchdog is disabled\n");
+    }
+
+
     kernel->add_module( &u );
 
     // clear up the config cache to save some memory
     kernel->config->config_cache_clear();
 
-    if(kernel->use_leds) {
+    if(kernel->is_using_leds()) {
         // set some leds to indicate status... led0 init doe, led1 mainloop running, led2 idle loop running, led3 sdcard ok
         leds[0]= 1; // indicate we are done with init
         leds[3]= sdok?1:0; // 4th led inidicates sdcard is available (TODO maye should indicate config was found)
@@ -249,7 +260,7 @@ int main()
     uint16_t cnt= 0;
     // Main loop
     while(1){
-        if(THEKERNEL->use_leds) {
+        if(THEKERNEL->is_using_leds()) {
             // flash led 2 to show we are alive
             leds[1]= (cnt++ & 0x1000) ? 1 : 0;
         }

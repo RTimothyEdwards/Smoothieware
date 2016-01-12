@@ -33,7 +33,7 @@ public:
 
     bool wait_for_probe(int& steps);
     bool run_probe(int& steps, bool fast= false);
-    bool run_probe_feed(int& steps, float feedrate);
+    bool run_probe_feed(int& steps, float feedrate, float max_dist= -1);
     bool return_probe(int steps);
     bool doProbeAt(int &steps, float x, float y);
     float probeDistance(float x, float y);
@@ -42,9 +42,10 @@ public:
     void home();
 
     bool getProbeStatus() { return this->pin.get(); }
-    float getSlowFeedrate() { return slow_feedrate; }
-    float getFastFeedrate() { return fast_feedrate; }
-    float getProbeHeight() { return probe_height; }
+    float getSlowFeedrate() const { return slow_feedrate; }
+    float getFastFeedrate() const { return fast_feedrate; }
+    float getProbeHeight() const { return probe_height; }
+    float getMaxZ() const { return max_z; }
     float zsteps_to_mm(float steps);
 
 private:
